@@ -24,6 +24,7 @@ private:
     void drawLanes() const;
     void drawHud() const;
     void drawJudgementText() const;
+    void drawComboMilestoneEffect() const;
 
     Chart chart_;
     ScoreManager score_;
@@ -33,5 +34,8 @@ private:
 
     Judgement lastJudgement_ = Judgement::None;
     float judgementTextTimer_ = 0.0f;
+    int lastComboMilestoneEffect_ = 0;
+    int comboMilestoneEffectCombo_ = 0;
+    float comboMilestoneEffectTimer_ = 0.0f;
     int laneFlash_[4] = {0, 0, 0, 0};
 };

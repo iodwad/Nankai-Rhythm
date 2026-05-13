@@ -35,6 +35,9 @@ Color judgementColor(Judgement judgement) {
 PlayScene::PlayScene(Game& game) : Scene(game) {
     chartLoaded_ = chart_.loadFromFile("assets/charts/easy.txt");
     score_.reset(chart_.getTotalNotes());
+    lastComboMilestoneEffect_ = 0;
+    comboMilestoneEffectCombo_ = 0;
+    comboMilestoneEffectTimer_ = 0.0f;
     startTime_ = GetTime();
 }
 
@@ -63,6 +66,10 @@ void PlayScene::update(float dt) {
 
     if (judgementTextTimer_ > 0.0f) {
         judgementTextTimer_ -= dt;
+    }
+
+    if (comboMilestoneEffectTimer_ > 0.0f) {
+        comboMilestoneEffectTimer_ -= dt;
     }
 
     if (!chartLoaded_ || finished_) {
@@ -96,11 +103,12 @@ void PlayScene::draw() {
 
     DrawLineEx(Vector2{Constants::LaneStartX - 40.0f, Constants::JudgeLineY},
                Vector2{Constants::LaneStartX + 4 * Constants::LaneWidth + 3 * Constants::LaneGap + 40.0f, Constants::JudgeLineY},
-               6.0f,
-               Color{255, 255, 255, 220});
+               comboMilestoneEffectTimer_ > 0.0f ? 10.0f : 6.0f,
+               comboMilestoneEffectTimer_ > 0.0f ? Color{255, 235, 90, 255} : Color{255, 255, 255, 220});
 
     drawHud();
     drawJudgementText();
+    drawComboMilestoneEffect();
 }
 
 float PlayScene::currentTime() const {
@@ -143,6 +151,12 @@ void PlayScene::judgeLane(int lane) {
 
 void PlayScene::applyJudgement(Judgement judgement) {
     score_.apply(judgement);
+    const int combo = score_.getCombo();
+    if (combo >= 10 && combo % 10 == 0 && combo > lastComboMilestoneEffect_) {
+        lastComboMilestoneEffect_ = combo;
+        comboMilestoneEffectCombo_ = combo;
+        comboMilestoneEffectTimer_ = 1.0f;
+    }
     lastJudgement_ = judgement;
     judgementTextTimer_ = 0.45f;
 }
@@ -218,4 +232,24 @@ void PlayScene::drawJudgementText() const {
     (void)scale;
     DrawText(text, x + 3, y + 3, fontSize, Fade(BLACK, 0.35f));
     DrawText(text, x, y, fontSize, judgementColor(lastJudgement_));
+}
+
+void PlayScene::drawComboMilestoneEffect() const {
+    if (comboMilestoneEffectTimer_ <= 0.0f) {
+        return;
+    }
+
+    char text[32];
+    std::snprintf(text, sizeof(text), "%d COMBO!", comboMilestoneEffectCombo_);
+
+    const float remaining = comboMilestoneEffectTimer_;
+    const float scale = 1.0f + remaining * 0.35f;
+    const int fontSize = static_cast<int>(56.0f * scale);
+    const int width = MeasureText(text, fontSize);
+    const int x = (Constants::ScreenWidth - width) / 2;
+    const int y = Constants::ScreenHeight / 2 - fontSize / 2;
+    const Color textColor = Fade(Color{255, 235, 90, 255}, remaining);
+
+    DrawText(text, x + 4, y + 4, fontSize, Fade(BLACK, 0.45f * remaining));
+    DrawText(text, x, y, fontSize, textColor);
 }

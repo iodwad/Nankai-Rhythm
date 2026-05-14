@@ -9,6 +9,7 @@
 
 Game::Game() {
     InitWindow(Constants::ScreenWidth, Constants::ScreenHeight, "Nankai Rhythm");
+    InitAudioDevice();
     SetExitKey(0);
     SetTargetFPS(60);
     goToMenu();
@@ -16,6 +17,9 @@ Game::Game() {
 
 Game::~Game() {
     currentScene_.reset();
+    if (IsAudioDeviceReady()) {
+        CloseAudioDevice();
+    }
     CloseWindow();
 }
 

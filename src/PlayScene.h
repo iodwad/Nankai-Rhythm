@@ -4,18 +4,26 @@
 #include "Scene.h"
 #include "ScoreManager.h"
 #include "Judgement.h"
+#include "raylib.h"
 
 #include <string>
 
 class PlayScene : public Scene {
 public:
     explicit PlayScene(Game& game);
+    ~PlayScene() override;
 
     void handleInput() override;
     void update(float dt) override;
     void draw() override;
 
 private:
+    void restart();
+    void loadMusic();
+    void startMusic();
+    void stopMusic();
+    void updateMusic(float dt);
+    float elapsedSinceRestart() const;
     float currentTime() const;
     void judgeLane(int lane);
     void applyJudgement(Judgement judgement);
@@ -28,8 +36,12 @@ private:
 
     Chart chart_;
     ScoreManager score_;
+    Music music_{};
     double startTime_ = 0.0;
+    float lastMusicTime_ = 0.0f;
     bool chartLoaded_ = false;
+    bool musicLoaded_ = false;
+    bool musicStarted_ = false;
     bool finished_ = false;
 
     Judgement lastJudgement_ = Judgement::None;

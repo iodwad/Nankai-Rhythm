@@ -4,11 +4,16 @@
 #include "Game.h"
 #include "raylib.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <limits>
 
 namespace {
+constexpr const char* ChartPath = "assets/charts/easy.txt";
+constexpr const char* MusicPath = "assets/music/demo.ogg";
+constexpr float leadInTime = 2.0f;
+
 const char* judgementToText(Judgement judgement) {
     switch (judgement) {
         case Judgement::Perfect: return "PERFECT";
@@ -33,17 +38,105 @@ Color judgementColor(Judgement judgement) {
 }
 
 PlayScene::PlayScene(Game& game) : Scene(game) {
-    chartLoaded_ = chart_.loadFromFile("assets/charts/easy.txt");
+    loadMusic();
+    restart();
+}
+
+PlayScene::~PlayScene() {
+    stopMusic();
+    if (musicLoaded_) {
+        UnloadMusicStream(music_);
+    }
+}
+
+void PlayScene::restart() {
+    chartLoaded_ = chart_.loadFromFile(ChartPath);
     score_.reset(chart_.getTotalNotes());
+    finished_ = false;
+    lastJudgement_ = Judgement::None;
+    judgementTextTimer_ = 0.0f;
     lastComboMilestoneEffect_ = 0;
     comboMilestoneEffectCombo_ = 0;
     comboMilestoneEffectTimer_ = 0.0f;
+    for (int& flash : laneFlash_) {
+        flash = 0;
+    }
     startTime_ = GetTime();
+    lastMusicTime_ = 0.0f;
+    musicStarted_ = false;
+
+    if (musicLoaded_) {
+        StopMusicStream(music_);
+        SeekMusicStream(music_, 0.0f);
+    }
+}
+
+void PlayScene::loadMusic() {
+    if (!IsAudioDeviceReady()) {
+        musicLoaded_ = false;
+        return;
+    }
+
+    music_ = LoadMusicStream(MusicPath);
+    musicLoaded_ = music_.stream.buffer != nullptr && music_.ctxData != nullptr && music_.frameCount > 0;
+    if (musicLoaded_) {
+        music_.looping = false;
+    }
+}
+
+void PlayScene::startMusic() {
+    if (!musicLoaded_ || musicStarted_) {
+        return;
+    }
+
+    StopMusicStream(music_);
+    SeekMusicStream(music_, 0.0f);
+    lastMusicTime_ = 0.0f;
+    musicStarted_ = true;
+    PlayMusicStream(music_);
+}
+
+void PlayScene::stopMusic() {
+    if (musicLoaded_) {
+        StopMusicStream(music_);
+    }
+    musicStarted_ = false;
+}
+
+void PlayScene::updateMusic(float dt) {
+    if (!musicLoaded_) {
+        return;
+    }
+
+    if (!musicStarted_ && elapsedSinceRestart() >= leadInTime) {
+        startMusic();
+        return;
+    }
+
+    if (!musicStarted_) {
+        return;
+    }
+
+    UpdateMusicStream(music_);
+
+    const float played = GetMusicTimePlayed(music_);
+    const float maxExpectedAdvance = std::max(0.5f, dt * 2.0f);
+    if (played >= lastMusicTime_ && played - lastMusicTime_ <= maxExpectedAdvance) {
+        lastMusicTime_ = played;
+    } else {
+        lastMusicTime_ += dt;
+    }
 }
 
 void PlayScene::handleInput() {
     if (IsKeyPressed(KEY_ESCAPE)) {
+        stopMusic();
         game_.goToMenu();
+        return;
+    }
+
+    if (IsKeyPressed(KEY_R)) {
+        restart();
         return;
     }
 
@@ -58,6 +151,8 @@ void PlayScene::handleInput() {
 }
 
 void PlayScene::update(float dt) {
+    updateMusic(dt);
+
     for (int& flash : laneFlash_) {
         if (flash > 0) {
             flash--;
@@ -81,6 +176,7 @@ void PlayScene::update(float dt) {
 
     if (time > chart_.getLastHitTime() + Constants::GameEndDelay) {
         finished_ = true;
+        stopMusic();
         game_.showResult(score_.makeSummary());
     }
 }
@@ -112,6 +208,18 @@ void PlayScene::draw() {
 }
 
 float PlayScene::currentTime() const {
+    if (musicLoaded_) {
+        if (musicStarted_) {
+            return lastMusicTime_;
+        }
+
+        return elapsedSinceRestart() - leadInTime;
+    }
+
+    return elapsedSinceRestart();
+}
+
+float PlayScene::elapsedSinceRestart() const {
     return static_cast<float>(GetTime() - startTime_);
 }
 

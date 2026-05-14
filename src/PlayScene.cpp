@@ -13,6 +13,7 @@ namespace {
 constexpr const char* ChartPath = "assets/charts/easy.txt";
 constexpr const char* MusicPath = "assets/music/demo.ogg";
 constexpr float leadInTime = 2.0f;
+constexpr float audioLatencyCompensation = 0.12f;
 
 const char* judgementToText(Judgement judgement) {
     switch (judgement) {
@@ -108,7 +109,8 @@ void PlayScene::updateMusic(float dt) {
         return;
     }
 
-    if (!musicStarted_ && elapsedSinceRestart() >= leadInTime) {
+    const float musicStartTime = std::max(0.0f, leadInTime - audioLatencyCompensation);
+    if (!musicStarted_ && elapsedSinceRestart() >= musicStartTime) {
         startMusic();
         return;
     }
@@ -210,7 +212,7 @@ void PlayScene::draw() {
 float PlayScene::currentTime() const {
     if (musicLoaded_) {
         if (musicStarted_) {
-            return lastMusicTime_;
+            return lastMusicTime_ - audioLatencyCompensation;
         }
 
         return elapsedSinceRestart() - leadInTime;
